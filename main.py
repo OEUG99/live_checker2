@@ -1,8 +1,19 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from yt_dlp import YoutubeDL, DownloadError
 import asyncio
+import os
 
-app = FastAPI()
+app = FastAPI(title="Live Checker", version="1.0.0")
+
+# Add CORS middleware for web access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # channel dictionary for all channels in the LCU ATM
 CHANNEL_IDS = {
     "UC7WRbUmD6W-dCP_UlDbhI4A": "LolcowTechTalk",
@@ -92,6 +103,10 @@ async def startup_event():
 # so they can be accessed from a local host
 
 ##  To use this function enter: "localhost:8000/live-status/all" into the browser after starting the app##
+@app.get("/")
+def health_check():
+    return {"status": "healthy", "service": "Live Checker"}
+
 @app.get("/live-status/live")
 def get_currently_live_channels():
     live_channels = []
