@@ -1,22 +1,26 @@
-# Use an official Python image
+# Dockerfile
 FROM python:3.11-slim
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y ffmpeg
+# System deps
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
+  && rm -rf /var/lib/apt/lists/*
 
-# Create app directory
+# Workdir
 WORKDIR /app
 
-# Copy project files
-COPY ./app /app
+# Install Python deps first (better caching)
+COPY requirements.txt .
+RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
-# Install Python dependencies
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
+# Copy the rest of the app
+COPY . .
 
-# Run the FastAPI app with Uvicorn
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Heroku provides PORT at runtime
+# (EXPOSE not required by Heroku, but fine to keep)
+EXPOSE 8000
+
+# Start app on the Heroku-assigned port
+CMD ["bash","-lc","uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
