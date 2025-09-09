@@ -1,0 +1,23 @@
+{
+  "name": "Live Checker",
+  "description": "YouTube Live Status Checker for multiple channels",
+  "repository": "https://github.com/yourusername/live_checker2",
+  "keywords": ["python", "fastapi", "youtube", "live-stream"],
+  "stack": "container",
+  "env": {
+    "PYTHONUNBUFFERED": {
+      "value": "1"
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ]
+}
