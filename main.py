@@ -24,11 +24,11 @@ CHANNEL_IDS = {
     "UCBQgQPjVx4wgszEmGR5cPJg": "LolcowCafe",
     "UCOzrx6iM9qQ4lIzf7BbkuCQ": "LolcowQueens",
     "UChcQ2TIYiihd9B4H50eRVlQ": "LolcowAussy",
-    "UCRh4qe6HGD10ZsyG56eUdHA": "LolcowMilkers",
     "UC9NU92OuAiSLvAarnqZEoUw": "LolcowTest",
     "UCW5AOoyYnirhluLJBpdKE9g": "LolcowDolls",
     "UCU3iQ0uiduxtArm9337dXug": "LolcowNerds",
     "UCAXmJMnzByOtsdOZKnnF8bQ": "LolcowChubby",
+    "UCRh4qe6HGD10ZsyG56eUdHA": "LolcowReaper"
 }
 #function that checks whether or not a channel is live
 def check_channel_live(channel_id):
@@ -36,7 +36,7 @@ def check_channel_live(channel_id):
     live_url = f"https://www.youtube.com/channel/{channel_id}/live"
     
     ydl_opts = {
-        "quiet": False,  # Enable logging to see errors
+        "quiet": True,  # Reduce noise in logs
         "skip_download": True,
         "socket_timeout": 10,
         "retries": 3,
@@ -45,16 +45,23 @@ def check_channel_live(channel_id):
         # Try to bypass bot detection
         "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "referer": "https://www.youtube.com/",
+        # Updated configuration for live streams
         "extractor_args": {
             "youtube": {
-                "player_client": ["android", "web"],
-                "skip": ["hls", "dash", "translated_subs"],
+                "player_client": ["web", "android", "ios"],  # Try multiple clients
+                "skip": ["translated_subs"],  # Don't skip hls/dash for live streams
             }
         },
         "http_headers": {
             "Accept-Language": "en-US,en;q=0.9",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
+        # Add cookies support if needed
+        "cookiesfrombrowser": None,  # Can be set to "chrome", "firefox", etc.
+        "nocheckcertificate": True,  # Skip certificate checks
+        "ignoreerrors": False,
+        "no_warnings": True,  # Suppress warnings
+        "verbose": False,  # Less verbose output
     }
 
     with YoutubeDL(ydl_opts) as ydl:
@@ -76,14 +83,39 @@ def check_channel_live(channel_id):
             }
         except DownloadError as e:
             error_msg = str(e)
-            print(f"⚠️ DownloadError for {channel_id}: {error_msg[:200]}")
-            
-            # Check if it's a bot detection error
-            if "Sign in to confirm" in error_msg or "bot" in error_msg.lower():
-                print(f"🤖 Bot detection triggered for {channel_id} - YouTube is blocking Heroku IP")
+
+            # Handle different types of YouTube errors
+            if "The channel is not currently live" in error_msg:
+                # Channel is simply not live - this is expected
+                return {
+                    "is_live": False,
+                    "channel_name": CHANNEL_IDS.get(channel_id, "Unknown"),
+                    "watch_url": None
+                }
+            elif "This live event will begin in" in error_msg:
+                # Scheduled live event - not yet started
+                return {
+                    "is_live": False,
+                    "channel_name": CHANNEL_IDS.get(channel_id, "Unknown"),
+                    "watch_url": None,
+                    "scheduled": True
+                }
+            elif "No video formats found" in error_msg:
+                # Video exists but can't get formats - might be processing
+                print(f"⚠️ Format error for {channel_id}: {error_msg[:100]}")
+                return {
+                    "is_live": False,
+                    "channel_name": CHANNEL_IDS.get(channel_id, "Unknown"),
+                    "watch_url": None
+                }
+            elif "Sign in to confirm" in error_msg or "bot" in error_msg.lower():
+                # Bot detection error
+                print(f"🤖 Bot detection triggered for {channel_id}")
                 return {"error": "bot_detection", "channel_id": channel_id}
-            
-            return None
+            else:
+                # Other errors
+                print(f"⚠️ DownloadError for {channel_id}: {error_msg[:200]}")
+                return None
         except Exception as e:
             print(f"❌ Error checking {channel_id}: {type(e).__name__}: {str(e)[:100]}")
             traceback.print_exc()
@@ -129,7 +161,7 @@ async def background_live_checker():
             await asyncio.sleep(300)  # Wait 5 minutes
             bot_detection_count = 0  # Reset counter
         else:
-            await asyncio.sleep(60)  # Normal 1 minute wait
+            await asyncio.sleep(300)  # Normal 1 minute wait
 
 # asynchronus function that tells the background live checker to run in the background at start
 ## to start this app enter: "uvicorn main:app --reload" into your terminal ##
